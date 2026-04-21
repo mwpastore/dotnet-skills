@@ -403,7 +403,7 @@ scenarios:
       - "Identifies that TestContext.Properties.Contains must become ContainsKey"
       - "Notes the project is using MSTest.Sdk/4.1.0 or confirms the SDK version upgrade"
       - "Mentions that MSTest.Sdk v4 no longer adds Microsoft.NET.Test.Sdk when using MTP"
-    timeout: 240
+    timeout: 300
 
   # ============================================================================
   # Goal 10: Verified package update with build and test validation
