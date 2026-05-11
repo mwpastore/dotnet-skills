@@ -75,6 +75,7 @@ tools:
   github:
     toolsets: [repos, issues, actions]
     min-integrity: none
+    allowed-repos: public
   bash: ["cat", "grep", "head", "tail", "jq", "date", "sort"]
 
 safe-outputs:
@@ -118,7 +119,7 @@ Record the `issue_number` and current issue `body`.
 
 ## Step 2: Fetch Recent Comments
 
-Use the GitHub MCP `issue_read` tool with `method: get_comments` to fetch all comments on the health dashboard issue.
+Use the GitHub MCP `issue_read` tool with `method: get_comments` to fetch comments on the health dashboard issue. The MCP tool returns the most recent comments; focus on comments from the last **30 days** (covers the 28-day P4 hard age cutoff plus a 2-day buffer). Discard any comments older than 30 days from your working set.
 
 ```
 issue_read(method: "get_comments", owner: "{owner}", repo: "{repo}", issue_number: {issue_number})
@@ -356,6 +357,6 @@ If changes were made, the summary is implicit in the safe-output calls. Do NOT c
 - **Don't hide human comments**: Never hide comments authored by humans. For bot comments (`github-actions[bot]`), P1–P3 only target Investigation and Daily overview patterns. P4 (hard age cutoff > 28 days) may hide any bot comment regardless of pattern. Never hide human comments, bot reactions from humans, etc.
 - **Idempotent**: Running this workflow twice should produce the same result. If investigation results are already linked, don't re-link them. If comments are already hidden, they won't appear in the API results (collapsed).
 - **Create missing sections**: If the issue body doesn't contain a `## 🔍 Investigation Results` section, **create it** from investigation comments (see Step 3). Do NOT silently skip linking — this is the groomer's primary job. Only skip Step 3 if there are zero investigation comments to link. When creating a missing section, use `operation: "replace-island"` — this will insert the section at the appropriate location.
-- **No intermediate files**: Do all work in memory. Do NOT write intermediate scripts, JSON files, or body text files. Parse API responses with `jq` inline and hold the issue body as a string variable.
+- **No intermediate files**: Do all work in memory. Do NOT write intermediate scripts, JSON files, or body text files. Hold parsed data and the issue body as in-memory variables.
 - **Use MCP `issue_read` for fetching comments**: Use the GitHub MCP `issue_read` tool with `method: get_comments` for fetching issue comments. If the response includes a `[Filtered]` notice, continue working with the comments that were returned — filtered items are from non-bot authors and are irrelevant to grooming. Do NOT call `report_incomplete` or `missing_tool` because of filtered items.
 - **`gh` CLI is NOT authenticated in the sandbox**: Never use `gh api` or other `gh` commands for GitHub API calls — the sandbox strips credentials by design. Use MCP tools for all GitHub reads.
