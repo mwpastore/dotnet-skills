@@ -8,7 +8,6 @@
   "dotnet-msbuild",
   "dotnet-nuget",
   "dotnet-template-engine",
-  "dotnet-test-experimental",
   "dotnet-test",
   "dotnet-upgrade",
   "dotnet",
