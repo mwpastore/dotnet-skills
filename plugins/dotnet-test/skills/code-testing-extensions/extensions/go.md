@@ -96,6 +96,10 @@ Use **table-driven tests** when generating multiple cases for the same behavior 
 - Whether they use **custom comparison helpers** (e.g., `cmp.Diff` with package-specific options like `data.FrameTestCompareOptions()`) — use those exact helpers
 - Whether they use **specific error assertion patterns** (e.g., `require.EqualError` vs `require.Contains`) — match the exact pattern
 
+**For every function that returns `error`**: find every code path that returns a non-nil error, craft an input that triggers it, and assert on the exact error message or error type. Include these as rows in your table-driven test.
+
+**Assert on exact computed values**: Do not write `if got == nil { t.Fatal() }` or `if len(got) == 0 { t.Fatal() }`. Instead, trace the function's algorithm for your test input, compute the expected output, and write `if got != want { t.Errorf(...) }` or `require.Equal(t, want, got)`.
+
 ```go
 func TestAdd(t *testing.T) {
     tests := []struct {

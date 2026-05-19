@@ -35,9 +35,11 @@ For each file in your phase:
 - **Read the entire source file** — do not write tests based on function names or signatures alone
 - Understand the public API — verify exact parameter types, count, return types, and **actual return values for key inputs** before writing assertions
 - **Trace the logic** for each code path you plan to test — understand what the function actually does, not what you think it should do
+- **Trace every error return** — identify each `return err`, `raise`, `panic`, `throw` in the function. Each one must have a test that triggers it with a specific input and asserts on the exact error
 - Note dependencies and how to mock them
 - **Validate project references**: Read the test project file and verify it references the source project(s) you'll test. Add missing references before creating test files
-- **Write mutation-resistant assertions**: Every test must assert on **concrete values** that the function computes — not just type checks (`isinstance`), non-null checks, or collection-length checks. Ask yourself: "If I deleted the core logic of this function, would this test still pass?" If yes, the assertion is too shallow. Assert on exact return values, specific field contents, exact string formats, and precise error messages.
+- **Write mutation-resistant assertions**: Every test must assert on **concrete values** that the function computes — not just type checks (`isinstance`), non-null checks, or collection-length checks. Read the function body, compute the expected output for your test input by tracing the algorithm, and assert on that exact value. Ask yourself: "If I deleted the core logic of this function, would this test still pass?" If yes, the assertion is too shallow. Assert on exact return values, specific field contents, exact string formats, and precise error messages.
+- **Extract requirements from the plan**: The plan specifies particular test scenarios. Treat each scenario as mandatory — do not skip any. After writing tests, verify every scenario from the plan has a corresponding test.
 
 ### 3. Register Test Project with Build System
 

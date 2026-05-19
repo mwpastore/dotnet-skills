@@ -41,6 +41,18 @@ Generate concise, parameterized, and effective unit tests using discovered conve
 | **Best Practices**            | Use Arrange-Act-Assert pattern and proper naming (`Method_Condition_ExpectedResult`)                 |
 | **Buildable & Complete**      | Tests must compile, run, and contain no hallucinated or missed logic                                 |
 
+## Task Requirements Extraction (Critical)
+
+Before writing any tests, extract every testable requirement from the task description:
+
+1. **Read the task description line by line** — every sentence that describes expected behavior, input/output, or error handling maps to at least one test
+2. **Build a checklist** — list every discrete behavior mentioned: specific return values, specific error messages, specific edge cases, specific formats. Each one becomes a test (or table-driven row)
+3. **Verify coverage** — after writing all tests, walk through the checklist. If any item is uncovered, add a test for it before finishing
+4. **Include negative cases** — for every "should do X", also test "should NOT do Y" if the task mentions it, or if the code has a conditional branch for it
+5. **Match exact values** — when the task says "returns error for unterminated quote" or "handles emoji with skin tone modifier", write a test with that exact scenario using concrete inputs
+
+**The completeness test**: Every requirement or scenario in the task prompt should have a corresponding test with a concrete assertion. If you only wrote happy-path tests but the task mentions error cases, edge cases, or specific scenarios, you have gaps.
+
 ## Quality over Quantity
 
 When the task specifies particular test scenarios or behaviors to cover:
@@ -81,6 +93,17 @@ Every test must be written so that **deleting or mutating the core logic of the 
 | `assert len(results) > 0` | Passes for any non-empty result | Assert exact count and content: `assert len(results) == 3` and check each element |
 | `assert "error" in str(e)` | Too loose — matches any error string | Assert exact error message: `assert str(e) == "specific error message"` |
 | `assert result.status == "ok"` | Only checks one field | Assert ALL significant fields of the result |
+| `assert 0 <= checksum <= 0xFFFF` | Range check passes for any int in range | Compute expected value manually: `assert checksum == 0x1234` |
+| `assert result.startswith("prefix")` | Only checks beginning | Assert full value: `assert result == "prefix_complete_expected_value"` |
+
+### Computing Expected Values
+
+To write strong assertions, you must **compute the expected output yourself** from the production code:
+
+1. **Read the function body** — trace the algorithm for your test input to determine the exact return value
+2. **Compute by hand** — for checksum functions, parsing functions, or formatting functions, manually compute what the output should be for your chosen input
+3. **Assert the computed value** — use `assert result == <your_computed_value>`, never `assert isinstance(result, int)`
+4. **For structured outputs** — assert on every significant field, not just one
 
 **The litmus test**: For each assertion, ask "If I replaced the function body with `return default_value`, would this test still pass?" If yes, strengthen the assertion.
 
@@ -104,6 +127,17 @@ Every test must be written so that **deleting or mutating the core logic of the 
 | **Edge Cases**        | Empty values, boundaries, special characters, zero/negative numbers |
 | **Error Cases**       | Invalid inputs, null handling, exceptions, timeouts                 |
 | **State Transitions** | Before/after operations, initialization, cleanup                    |
+
+### Error Path Coverage (Mandatory)
+
+For every function that returns errors or can fail:
+
+1. **Find every error return** in the function body — each `return err`, `raise`, `panic`, `throw` statement is a test case
+2. **Craft the input that triggers each error** — invalid format, missing field, too-long input, empty input
+3. **Assert on the exact error** — match the error message, error type, or error code precisely (not just "an error was returned")
+4. **Test boundary conditions** — off-by-one, exactly-at-limit, just-past-limit
+
+If the function has 3 error paths, you need at least 3 error tests.
 
 ## Language-Specific Examples
 

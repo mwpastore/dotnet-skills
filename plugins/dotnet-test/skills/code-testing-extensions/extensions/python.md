@@ -100,6 +100,30 @@ Match the repo's existing conventions. Common patterns:
 
 If writing new tests in a repo with no tests, default to pytest conventions.
 
+## Mutation-Resistant Assertions (Python-Specific)
+
+Never write shallow assertions that would pass if the function did nothing:
+
+```python
+# BAD — passes if function returns any int
+result = compute_checksum(data)
+assert isinstance(result, int)
+assert 0 <= result <= 0xFFFF
+
+# GOOD — asserts on the exact computed value
+result = compute_checksum(b"\x01\x02\x03\x04")
+assert result == 0x0A06  # computed by tracing the algorithm
+
+# BAD — passes for any non-empty string
+assert result is not None
+assert len(result) > 0
+
+# GOOD — asserts on exact content
+assert result == "expected_formatted_output"
+```
+
+**For every test**: Read the function source, trace the algorithm with your chosen input, compute the expected output, then assert `==` on the exact value. For error cases, assert on the exact exception type and message.
+
 ## Common Errors
 
 | Error | Fix |
