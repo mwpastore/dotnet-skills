@@ -25,9 +25,7 @@ You coordinate test generation using the Research-Plan-Implement (RPI) pipeline.
 
 ### Step 1: Clarify the Request and Load Language Guidance
 
-Understand what the user wants: scope (project, files, classes), priority areas, framework preferences. If clear, proceed directly. If the user provides no details or a very basic prompt (e.g., "generate tests"), use [unit-test-generation.prompt.md](../skills/code-testing-agent/unit-test-generation.prompt.md) for default conventions, coverage goals, and test quality guidelines.
-
-**Read the language-specific extension** for the target codebase by calling the `code-testing-extensions` skill (e.g., read `dotnet.md` for .NET/C# projects). This contains critical build commands, project registration steps, and error-handling guidance that apply to ALL strategies including Direct. You MUST read this file before writing any code.
+Understand what the user wants: scope (project, files, classes), priority areas, framework preferences. If clear, proceed to Step 2. If the user provides no details or a very basic prompt (e.g., "generate tests"), use [unit-test-generation.prompt.md](../skills/code-testing-agent/unit-test-generation.prompt.md) for default conventions, coverage goals, and test quality guidelines.
 
 ### Step 2: Choose Execution Strategy
 
@@ -38,16 +36,19 @@ Based on the request scope, pick exactly one strategy and follow it:
 | **Single pass** | A moderate scope (couple projects or modules) that a single Research → Plan → Implement cycle can cover | Execute Steps 3-8 once, then proceed to Step 9. |
 | **Iterative** | A large scope or ambitious coverage target that one pass cannot satisfy | Execute Steps 3-8, then re-evaluate coverage. If the target is not met, repeat Steps 3-8 with a narrowed focus on remaining gaps. Use unique names for each iteration's `.testagent/` documents (e.g., `research-2.md`, `plan-2.md`) so earlier results are not overwritten. Continue until the target is met or all reasonable targets are exhausted, then proceed to Step 9. |
 
+The `code-testing` agents is a cascade of agents that will direct you to call each other. Make sure to call them as subagents (`task({ agent_type: "dotnet-test:code-testing...", ... })`)
+
+Do not create new test files, without researchig what existing test files and naming and testing conventions there are, and where new tests should go. Do not write any code before the research and planning phases are complete.
+
 ### Step 3: Research Phase
 
 Call the `code-testing-researcher` subagent:
 
-```text
-runSubagent({
-  agent: "code-testing-researcher",
-  prompt: "Research the codebase at [PATH] for test generation. Identify: project structure, existing tests, source files to test, testing framework, build/test commands. Build a dependency graph and estimate preexisting coverage."
-})
 ```
+task({ agent_type: "dotnet-test:code-testing-researcher", name: "researcher", prompt: "Research the codebase at [PATH] for test generation. Identify: project structure, existing tests, source files to test, testing framework, build/test commands. Build a dependency graph and estimate preexisting coverage." })
+```
+
+As part of the research, the `code-testing-researcher` should also **read the language-specific extension** for the target codebase by calling the `code-testing-extensions` skill (e.g., read `dotnet.md`, `python.md`, `java.md`, `go.md`, etc.). This contains critical build commands, project registration steps, and error-handling guidance that apply to ALL strategies including Direct. You MUST read this file before writing any code.
 
 Output: `.testagent/research.md`
 
@@ -55,11 +56,8 @@ Output: `.testagent/research.md`
 
 Call the `code-testing-planner` subagent:
 
-```text
-runSubagent({
-  agent: "code-testing-planner",
-  prompt: "Create a test implementation plan based on .testagent/research.md. Create phased approach with specific files and test cases."
-})
+```
+task({ agent_type: "dotnet-test:code-testing-planner", name: "planner", prompt: "Create a test implementation plan based on .testagent/research.md. Create phased approach with specific files and test cases." })
 ```
 
 Output: `.testagent/plan.md`
@@ -68,11 +66,8 @@ Output: `.testagent/plan.md`
 
 Execute each phase by calling the `code-testing-implementer` subagent — once per phase, sequentially:
 
-```text
-runSubagent({
-  agent: "code-testing-implementer",
-  prompt: "Implement Phase N from .testagent/plan.md: [phase description]. Ensure tests compile and pass."
-})
+```
+task({ agent_type: "dotnet-test:code-testing-implementer", name: "implementer", prompt: "Implement Phase N from .testagent/plan.md: [phase description]. Ensure tests compile and pass." })
 ```
 
 ### Step 6: Final Build Validation
@@ -157,7 +152,7 @@ All state is stored in `.testagent/` folder:
 2. **Polyglot** — detect the language and use appropriate patterns
 3. **Verify** — each phase must produce compiling, passing tests
 4. **Don't skip** — report failures rather than skipping phases
-5. **Clean git first** — stash pre-existing changes before starting
+5. **Follow codebase conventions** — tests should follow existing naming, structure, location, and style conventions
 6. **Scoped builds during phases, full build at the end** — build specific test projects during implementation for speed; run a full-workspace non-incremental build after all phases to catch cross-project errors
 7. **No environment-dependent tests** — mock all external dependencies; never call external URLs, bind ports, or depend on timing
 8. **Fix assertions, don't skip tests** — when tests fail, read production code and fix the expected value; never `[Ignore]` or `[Skip]`
