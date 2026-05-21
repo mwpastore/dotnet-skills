@@ -25,3 +25,7 @@ tool-ref:msbuild:#tool:agent/runSubagent
 
 # dotnet-msbuild plugin: AITools.BinlogMcp server (binlog analysis MCP from dotnet-eng feed)
 mcp-server:dotnet-msbuild:binlog
+
+# dotnet-blazor plugin: Playwright browser automation MCP server and Microsoft Learn docs
+mcp-server:dotnet-blazor:playwright
+mcp-server:dotnet-blazor:microsoft-docs

@@ -1,0 +1,164 @@
+scenarios:
+  - name: "Warehouse dashboard with site selector and live stock alerts"
+    setup: &server_project
+      commands:
+        - "dotnet new blazor --interactivity server --no-https --force"
+    prompt: |
+      I have a Blazor Web App using per-page interactivity (InteractiveServer).
+
+      I'm building a warehouse management dashboard. Here's what I need:
+
+      1. A "current warehouse" dropdown in the app header (which lives in the
+         layout). The user picks which warehouse site they're managing. Every
+         component on every page should automatically know which warehouse is
+         currently selected — I don't want each component to manually look up
+         the current warehouse, it should just be available to them. When the
+         user switches warehouses, everything on the current page should
+         immediately update to reflect the new site. Keep in mind the layout
+         renders statically while the page content is interactive.
+
+      2. A live low-stock alert count that checks for items below minimum
+         levels every 10 seconds. Create an InventoryAlertService with a
+         GetLowStockCountAsync(string warehouseId) method that simulates a
+         database query (return a random number between 0 and 15). The alert
+         count should appear as a badge in the sidebar navigation AND on the
+         main dashboard page. Polling should start when the dashboard is
+         visible and stop when the user leaves the page. The sidebar badge
+         should also refresh when new data arrives.
+
+      3. Multiple warehouse managers using the app simultaneously must each
+         see their own independent warehouse selection and alert counts.
+         One manager switching to "Warehouse B" must not affect another
+         manager viewing "Warehouse A".
+
+      Build the necessary state management, the polling mechanism, a
+      warehouse selector component, an alert badge component, and a
+      dashboard page that ties it all together.
+    assertions:
+      - type: "file_contains"
+        path: "**/Program.cs"
+        value: "CascadingValueSource"
+      - type: "file_contains"
+        path: "**/Program.cs"
+        value: "AddCascadingValue"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "InvokeAsync"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "NotifyChangedAsync"
+    rubric:
+      - "The selected warehouse is available to all interactive page components without each component manually looking it up via DI injection — the static layout boundary is crossed correctly (a <CascadingValue> in the static layout won't work, so a DI-registered CascadingValueSource<T> or equivalent mechanism is needed)"
+      - "When the user picks a different warehouse, all subscribed components re-render with the new value without a full page reload — the update propagates programmatically via NotifyChangedAsync or event notification, not by destroying and recreating the circuit with NavigationManager.Refresh"
+      - "Polling fires on a background timer thread outside the Blazor synchronization context, so any component that re-renders in response to timer ticks wraps StateHasChanged inside InvokeAsync — calling StateHasChanged directly from a timer callback would throw InvalidOperationException"
+      - "Each user's state is isolated: mutable state services use scoped lifetime (one instance per circuit) — using a singleton on Server would leak one user's warehouse selection into every other user's session"
+      - "Polling is stopped and all event subscriptions are removed when components are disposed — the component implements IDisposable or IAsyncDisposable, disposes the timer or CancellationTokenSource, and unsubscribes event handlers to prevent per-circuit memory leaks"
+    timeout: 900
+
+  - name: "Shopping cart shared across product and checkout pages"
+    setup:
+      commands:
+        - "dotnet new blazor --interactivity server --all-interactive --no-https --force"
+    prompt: |
+      I have a Blazor Web App with global Interactive Server mode.
+
+      I'm building a simple e-commerce site. The key challenge is
+      coordinating shared state between components that aren't in a
+      parent-child relationship — a product list, a navigation badge, and a
+      cart page all need to stay in sync without direct parameter passing.
+
+      1. A CartState service that holds a list of items (Id, Name, Price,
+         Quantity). It should support Add, Remove, and Clear operations.
+         Multiple components on different pages need to react when the cart
+         changes — if I add an item from the product list, the cart icon in
+         the header should immediately update its badge count.
+
+      2. A /products page with a list of hardcoded products (at least 5). Each
+         product has an "Add to Cart" button. When clicked, the item is added
+         and the cart badge in the nav updates without a page reload.
+
+      3. A cart badge component in the NavMenu that shows the current item
+         count. It should always reflect the latest state — even if an item
+         was added from a completely different page.
+
+      4. A /cart page that lists all items with quantities and a total price.
+         Each item has a "Remove" button. Removing an item should update the
+         badge in the nav immediately.
+
+      5. Each user's cart must be independent — one user adding items must not
+         affect another user's cart.
+
+      Build the cart service, the badge component, the product page, and the
+      cart page.
+    assertions:
+      - type: "file_contains"
+        path: "**/Program.cs"
+        value: "AddScoped"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "OnChange"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "IDisposable"
+    rubric:
+      - "CartState is a scoped service (not singleton) registered via AddScoped — on Server, scoped means per-circuit so each user gets their own isolated cart"
+      - "CartState exposes an event (Action OnChange or similar) that fires after every mutation (Add, Remove, Clear) — this is the change notification mechanism"
+      - "Components that display cart data (badge, cart page) subscribe to the OnChange event in OnInitialized and call StateHasChanged to re-render — they unsubscribe in Dispose to prevent memory leaks"
+      - "The cart badge in the nav and the cart page both react to changes made from any page — adding from /products updates the badge, removing from /cart updates the badge, without page reloads or NavigationManager.Refresh"
+      - "Components implement IDisposable and unsubscribe from CartState.OnChange in Dispose — prevents leaked event handlers across circuit lifetime"
+    timeout: 1800
+
+  - name: "Multi-page wizard with shared progress indicator"
+    setup:
+      commands:
+        - "dotnet new blazor --interactivity server --no-https --force"
+    prompt: |
+      I have a Blazor Web App with per-page Interactive Server mode.
+
+      I'm building a job application wizard that spans multiple pages. The
+      layout has a static header that shows a progress bar (e.g., "Step 2
+      of 4") and the navigation links for each step. The page content below
+      is interactive.
+
+      Here's the structure:
+
+      1. Four pages: /apply/personal-info, /apply/experience,
+         /apply/references, /apply/review. Each page is its own interactive
+         Razor component.
+
+      2. A progress indicator in the layout that shows which step the user
+         is currently on and highlights completed steps. The layout renders
+         statically (it's a standard MainLayout) while each page content
+         renders interactively.
+
+      3. When the user fills out a step and clicks "Next", the data from that
+         step should be saved so that when they navigate to the next step (or
+         back to a previous step), the data is still there. Each step saves
+         fields like: name/email (step 1), job history entries (step 2),
+         reference contacts (step 3).
+
+      4. The review page (step 4) must display all data entered in steps 1–3.
+
+      5. Each applicant's progress is independent — one user filling out their
+         application must not see another user's data.
+
+      Keep in mind the layout is static but the pages are interactive — they
+      run in different render modes. Figure out how to make the progress and
+      data accessible across this boundary.
+    assertions:
+      - type: "file_contains"
+        path: "**/Program.cs"
+        value: "AddCascadingValue"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "CascadingParameter"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "NotifyChangedAsync"
+    rubric:
+      - "Uses CascadingValueSource<T> registered in DI with AddCascadingValue — required because the layout renders statically and a <CascadingValue> in the static layout would not reach the interactive page components"
+      - "Application state (progress and form data) is available to both the static layout (progress indicator) and interactive pages via [CascadingParameter] — the state crosses the render mode boundary via DI registration"
+      - "When a step is completed, the component calls NotifyChangedAsync to update the cascaded value — this triggers re-rendering in all subscribers including the progress indicator"
+      - "State is scoped per user (the CascadingValueSource registration uses a scoped factory or the backing data is scoped) — one applicant's data does not leak to another"
+      - "The review page reads all previously entered data from the shared state without re-asking the user — data persists across page navigations within the wizard"
+    timeout: 1800
