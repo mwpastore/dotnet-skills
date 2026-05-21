@@ -1,0 +1,141 @@
+scenarios:
+  - name: "Company intranet with role-based access and authorization policies"
+    setup: &server_project
+      commands:
+        - "dotnet new blazor --interactivity server --no-https --force"
+    prompt: |
+      I have a Blazor Web App with Interactive Server (per-page).
+
+      I'm building a company intranet. I need ASP.NET Core Identity with
+      role-based access control. Here's what I need:
+
+      1. Set up Identity with three roles: Admin, Manager, and Employee.
+         Use an in-memory database for now. Seed one test user per role
+         on startup so I can test everything:
+         - admin@company.com (Admin role)
+         - manager@company.com (Manager role)
+         - employee@company.com (Employee role)
+         All with password "Test123!"
+
+      2. An interactive /admin/users page. Only Admins should be able to
+         access this page. Show a list of all users with their roles
+         (query from UserManager).
+
+      3. An interactive /reports page that both Admins and Managers can access
+         but not regular Employees. Show some placeholder report content.
+
+      4. An interactive /directory page accessible to any authenticated user.
+         Show a simple employee list.
+
+      5. The navigation menu should show or hide links based on the current
+         user's roles — don't show the admin link to non-admins, don't show
+         reports to employees.
+
+      6. If an unauthenticated user tries to visit any protected page, they
+         should be sent to a login page. If an authenticated user visits a
+         page they don't have the role for, they should see an "Access Denied"
+         message.
+    assertions:
+      - type: "file_contains"
+        path: "**/Program.cs"
+        value: "AddRoles"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "AuthorizeRouteView"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: "Authorize"
+    rubric:
+      - "Identity is configured with role support (AddRoles<IdentityRole> or equivalent) and three roles are seeded with one test user per role — the seed code runs on startup and does not fail if roles or users already exist"
+      - "The admin page restricts access to Admin-only via [Authorize(Roles = \"Admin\")], a named authorization policy, or equivalent mechanism — the reports page restricts access to Admin and Manager roles"
+      - "Routes.razor uses AuthorizeRouteView with a NotAuthorized template that distinguishes unauthenticated users (redirect to login) from authenticated-but-unauthorized users (shows an Access Denied message)"
+      - "Navigation menu conditionally shows links using AuthorizeView with Roles — admin links are hidden from non-admins, report links are hidden from Employees, and the directory link is visible to all authenticated users"
+    timeout: 1800
+  - name: "Login and account management in a globally interactive app"
+    setup:
+      commands:
+        - "dotnet new blazor --interactivity server --all-interactive --no-https --force"
+    prompt: |
+      I have a Blazor Web App with Interactive Server mode applied globally
+      (all pages are interactive by default).
+
+      I need to add ASP.NET Core Identity-based authentication. Specifically:
+
+      1. A /account/login page where users can sign in with email and password
+         using SignInManager. For now, just build the page with a login form
+         that calls SignInManager.PasswordSignInAsync — I'll wire up the
+         database and user seeding later. I just need the page structure and
+         the sign-in call to be correct.
+
+      2. A /account/register page where users can create an account using
+         UserManager.CreateAsync. Same deal — build the page with a
+         registration form that calls the right APIs.
+
+      3. The rest of the app should remain fully interactive. Only the
+         authentication pages should be set up in whatever way they need to
+         work correctly with SignInManager and UserManager.
+
+      4. Make sure App.razor and routing are configured so that navigating
+         to these account pages actually works — don't just add the pages
+         and hope for the best.
+
+      Set up the Identity services in Program.cs. You can use an in-memory
+      database for the EF store if needed.
+    assertions:
+      - type: "file_contains"
+        path: "**/*ogin*"
+        value: "ExcludeFromInteractiveRouting"
+      - type: "file_contains"
+        path: "**/App.razor"
+        value: "AcceptsInteractiveRouting"
+      - type: "file_contains"
+        path: "**/*ogin*"
+        value: "SignInManager"
+    rubric:
+      - "Login and register pages use [ExcludeFromInteractiveRouting] to render as static SSR — SignInManager and UserManager depend on HttpContext and throw InvalidOperationException inside interactive components"
+      - "App.razor conditionally applies the render mode using HttpContext.AcceptsInteractiveRouting() — returns null (static SSR) for excluded pages and the configured interactive mode for everything else"
+      - "Identity services are registered in Program.cs (AddIdentityCore or AddIdentity, AddEntityFrameworkStores, AddSignInManager) and authentication middleware is configured"
+      - "The rest of the app remains globally interactive — only the Identity pages that need HttpContext opt out of interactive routing"
+    timeout: 1200
+
+  - name: "Multi-tier app with WebAssembly auth"
+    setup:
+      commands:
+        - "dotnet new blazor --interactivity auto --no-https --force"
+    prompt: |
+      I have a Blazor Web App using Auto interactivity mode (per-page). Some
+      pages will run on Server, others on WebAssembly.
+
+      I need to add authentication that works across both render modes:
+
+      1. Create a custom AuthenticationStateProvider on the server that
+         simulates a logged-in user "bob@example.com" with roles "User" and
+         "Editor". No real database needed — just hardcode the claims.
+
+      2. A /profile page (interactive, any mode) that displays the authenticated
+         user's name and all their roles. It should work regardless of whether
+         it's currently running on Server or WebAssembly.
+
+      3. A /editor page (interactive, any mode) restricted to the "Editor" role.
+         Show an "Access denied" message for users without the role.
+
+      4. A /viewer page (interactive, any mode) accessible to any authenticated
+         user.
+
+      The key requirement: after the page initially loads and the WebAssembly
+      runtime takes over, the user's identity and roles must still be available.
+      I've heard that auth state can get lost when the client-side runtime
+      activates — make sure that doesn't happen.
+    assertions:
+      - type: "file_contains"
+        path: "**/Program.cs"
+        value: "AddAuthenticationStateSerialization"
+      - type: "file_contains"
+        path: "**/*.razor"
+        value: '[Authorize'
+    rubric:
+      - "Server Program.cs calls AddAuthenticationStateSerialization so auth state is serialized into the prerendered HTML — without this the WebAssembly runtime starts with an anonymous user"
+      - "Client Program.cs calls AddAuthenticationStateDeserialization so the WASM runtime can reconstitute the auth state from the serialized data"
+      - "Profile page displays user name and roles that remain correct after WebAssembly takes over from prerendering — the auth state is not lost during the handoff"
+      - "Editor page enforces role-based access via [Authorize(Roles = ...)] or AuthorizeView with Roles — unauthorized users see a denied message, not the page content"
+    timeout: 600

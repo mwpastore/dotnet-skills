@@ -1,0 +1,131 @@
+scenarios:
+  - name: "Event registration with custom validation"
+    setup: &blazor_project
+      commands:
+        - "dotnet new blazor --interactivity server --no-https --force"
+    prompt: |
+      I have an existing Blazor Web App with Interactive Server (per-page).
+
+      I need an interactive /register page for event registration:
+      - Attendee name (required)
+      - Email (required, valid email)
+      - Number of guests (0-5)
+      - Preferred session (Morning, Afternoon, Evening)
+      - Special dietary requirements (free text, optional)
+
+      Here's the catch: after the user fills everything in and clicks Register,
+      I need to check with the server whether that email is already registered
+      for this event. If it is, show an error message on the email field saying
+      "This email is already registered" — not a generic error, but a field-specific
+      error that appears right next to the email input. The user should be able to
+      change the email and try again.
+
+      Create a RegistrationService with a stub ValidateAsync method that returns
+      field-specific errors (simulate the email already being registered for a
+      hardcoded test email like "taken@example.com").
+    assertions:
+      - type: "file_exists"
+        path: "**/Register.razor"
+      - type: "file_contains"
+        path: "**/Register.razor"
+        value: "EditForm"
+      - type: "file_contains"
+        path: "**/Register.razor"
+        value: "ValidationMessage"
+      - type: "file_contains"
+        path: "**/Register.razor"
+        value: "DataAnnotationsValidator"
+    rubric:
+      - "Uses a custom validator component (or ValidationMessageStore directly) to display server-returned field-specific errors — the email duplicate error appears next to the email field via ValidationMessage, not as a generic message"
+      - "Model uses data annotation attributes for basic validation (Required, EmailAddress, Range) with DataAnnotationsValidator"
+      - "Submit handler calls the registration service, checks for server-returned errors, and displays them on the correct fields without losing the user's input"
+      - "The form lets the user correct the email and resubmit — errors clear when the field changes"
+      - "Uses InputText, InputNumber, InputSelect or InputRadioGroup for the respective fields"
+    timeout: 600
+
+  - name: "Product review with photo upload and server-side checks"
+    setup: *blazor_project
+    prompt: |
+      I have an existing Blazor Web App with Interactive Server (per-page).
+
+      I need an interactive /write-review page where customers review a product:
+      - Product name (required, text)
+      - Rating (required, 1-5)
+      - Review title (required, max 100 chars)
+      - Review body (required, multi-line, max 2000 chars)
+      - Upload up to 3 photos (JPG/PNG only, up to 5 MB each)
+      - Submit button
+
+      When the user picks photos, show the file names and sizes below the upload
+      control. When they submit:
+      1. First check data annotations (required fields, lengths)
+      2. Then call a ReviewService.ValidateAndSubmitAsync (create a stub) that
+         checks server-side rules and may return field-specific errors — for
+         example, if the review title contains profanity, return an error on the
+         ReviewTitle field saying "Review title contains inappropriate language".
+         Simulate this by rejecting any review title containing the word "spam".
+      3. If server validation fails, show the errors next to the relevant fields.
+         The user should be able to edit and resubmit without re-uploading photos.
+      4. If everything passes, show a success confirmation.
+
+      Make sure the photo upload can handle files up to 5 MB — the default
+      might be too small.
+    assertions:
+      - type: "file_exists"
+        path: "**/WriteReview.razor"
+      - type: "file_contains"
+        path: "**/WriteReview.razor"
+        value: "EditForm"
+      - type: "file_contains"
+        path: "**/WriteReview.razor"
+        value: "InputFile"
+      - type: "file_contains"
+        path: "**/WriteReview.razor"
+        value: "ValidationMessage"
+    rubric:
+      - "Uses InputFile with OnChange handler and OpenReadStream(maxAllowedSize) to handle photo uploads up to 5 MB — does not rely on the default stream size limit"
+      - "Uses a custom validator component or ValidationMessageStore to display server-returned field-specific errors (like profanity check) via ValidationMessage — not manual conditional divs"
+      - "Displays uploaded file names and sizes after selection — uses InputFileChangeEventArgs.File or GetMultipleFiles correctly"
+      - "Model has data annotation attributes (Required, Range, StringLength) with DataAnnotationsValidator — both client and server validation are layered"
+      - "After server validation failure, user can edit fields and resubmit without re-selecting photos — file state is preserved across validation round-trips"
+    timeout: 600
+
+  - name: "Editable inventory grid with inline row editing"
+    setup: *blazor_project
+    prompt: |
+      I have a Blazor Web App with Interactive Server (per-page).
+
+      I need an interactive /inventory page that displays products in a table.
+      Seed 5-6 sample products with fields: Name, Quantity, Unit Price, Category
+      (categories: Electronics, Clothing, Food, Other). Create a Product model and
+      an InventoryService (registered as singleton) with GetAllAsync and UpdateAsync methods.
+
+      The table shows columns for Name, Quantity, Unit Price, Category, and an Actions column.
+
+      When the user clicks Edit on a row:
+      - That row switches to edit mode — the display values become editable inputs
+      - Only one row can be in edit mode at a time
+      - The row shows Save and Cancel buttons instead of Edit
+      - Category should be a dropdown with the fixed options
+      - All fields validate (name required, quantity 0-9999, price > 0, category required)
+
+      Clicking Save validates and calls InventoryService.UpdateAsync, then returns
+      to display mode. Clicking Cancel discards changes and returns to display mode
+      without calling the service.
+    assertions:
+      - type: "file_exists"
+        path: "**/Inventory.razor"
+      - type: "file_contains"
+        path: "**/Inventory.razor"
+        value: "EditForm"
+    rubric:
+      - "Products are displayed in a tabular layout with columns for Name, Quantity, Unit Price, Category, and an action column"
+      - "Clicking Edit on a row replaces that row's display text with Blazor input components (InputText, InputNumber, InputSelect) — not raw HTML input elements and not a modal or separate form"
+      - "Only one row can be in edit mode at a time — clicking Edit on row B while row A is open either closes A first or prevents opening B"
+      - "The editing row uses a separate model instance — editing does not mutate the original product until Save is called"
+      - "Cancel discards edits and restores the original values without calling UpdateAsync — uses a snapshot or copy to revert"
+      - "Validation uses DataAnnotationsValidator with data annotation attributes on the model — not manual Validator.TryValidateObject calls"
+      - "Category is an InputSelect dropdown with fixed options (Electronics, Clothing, Food, Other) — not a free-text input"
+      - "The page loads products from InventoryService.GetAllAsync on initialization and the table reflects updated values after Save"
+    timeout: 900
+
